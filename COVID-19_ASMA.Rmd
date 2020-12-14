@@ -1,0 +1,118 @@
+---
+title: "Casos de covid-19 con padecimiento asmático/Covid-19 cases with asthmatic disease"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(readr)
+library(xts)
+library(dygraphs)
+library(dplyr)
+library(magrittr)
+library(lubridate)
+library(forecast)
+library(utils)
+library(ggplot2)
+library(devtools)
+library("mxmaps")
+
+source("dash.R")
+```
+
+Evolución de casos por día
+===========================
+
+
+### Casos confirmados en México
+
+```{r}
+x %>%
+  select(CASOS) %>%
+  xts(order.by = x$FECHA_SINTOMAS) %>%
+  dygraph(x$CASOS, main = "") %>%
+  dyAxis("x", label="Fechas") %>%
+  dyRoller(showRoller = TRUE, rollPeriod = 7) %>%
+  dyRangeSelector(dateWindow=dateWindow)
+```
+
+
+
+### Decesos confirmados en México
+
+```{r}
+y %>%
+  select(DECESOS) %>%
+  xts(order.by = y$FECHA_DEF) %>%
+  dygraph(y$DECESOS, main = "") %>%
+  dyAxis("x", label="Fechas") %>%
+  dyRoller(showRoller = TRUE, rollPeriod = 7) %>%
+  dyRangeSelector(dateWindow=dateWindow)
+```
+
+
+Mapa
+======================================
+
+### Estados con casos positivos y padecimiento de asma
+
+```{r}
+asma.ent %>%
+  mutate(region=ENTIDAD_RES, value=ASMA) %>%
+  mxstate_choropleth(asma.ent, title = "México")
+```
+
+Covid y asma
+================
+
+Row
+-------
+### Decesos de casos positvos a covid-19
+
+```{r}
+barplot(s$DEF, main = "",
+        names.arg  = c("Total", "Presenta sintomas de asma"),
+        col = c("royalblue", "seagreen"))
+```
+
+
+### Casos positivos por covid-19 hospitalizados
+
+```{r}
+barplot(r$Hospitalizado, main = "",
+        names.arg  = c("Total", "Presenta sintomas de asma"),
+        col = c("royalblue", "seagreen"))
+```
+
+
+Row
+-------
+
+### Decesos con covid-19 y padecimiendo de asma
+
+```{r}
+barplot(u$DEF, main = "", names.arg  = c("Total", "Hospitalizados"),
+        col = c("royalblue", "red"))
+```
+
+
+Inputs {.sidebar}
+--------
+
+Total de casos confirmados con COVID-19: 1191402
+
+Casos con asma: 29317
+
+Total de decesos confirmados: 109021
+
+Decesos con padecimiento de asma: 2114
+
+Total de casos hospitalizados: 249768
+
+Hospitalizados con asma: 5392
+
+Total de decesos que padecían asma y fueron hospitalizados : 1869
+
+
