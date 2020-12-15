@@ -10,6 +10,7 @@ library(readxl)
 library(plyr)
 library(utils)
 library(ggplot2)
+library(plotly)
 library(devtools)
 library("mxmaps")
 
@@ -18,31 +19,32 @@ library("mxmaps")
 
 
 # Descarga y extracción de los datos
-download.file(url="https://github.com/carranco-sga/Mexico-COVID-19/raw/master/Open_data/COVID-19/202012/20201208.zip", destfile="covid19_gobmx.zip")
-  unzip(zipfile = "covid19_gobmx.zip")
+#download.file(url="https://github.com/carranco-sga/Mexico-COVID-19/raw/master/Open_data/COVID-19/202012/20201208.zip", destfile="covid19_gobmx.zip")
+ # unzip(zipfile = "covid19_gobmx.zip")
 
 # Lectura de datos
 covid19.Mexico <- read.csv("201208COVID19MEXICO.csv", header = TRUE, sep = ",", na.strings = "")
 
-View(covid19.Mexico)
+head(covid19.Mexico)
 
 
 
 # Descarga y extraccion de diccionarios de terminos que se guardan en tu directorio de trabajo
-download.file(url="https://github.com/carranco-sga/Mexico-COVID-19/raw/master/Open_data/COVID-19/202012/diccionario_20201208.zip", destfile="diccionario_gobmx.zip")
-  unzip(zipfile = "diciionario_gobmx.zip")
+#download.file(url="https://github.com/carranco-sga/Mexico-COVID-19/raw/master/Open_data/COVID-19/202012/diccionario_20201208.zip", destfile="diccionario_gobmx.zip")
+ # unzip(zipfile = "diciionario_gobmx.zip")
 
   
 # Tendremos en cuenta los casos confirmados por SARS-CoV2 que indica la columna de Clasificacion_final y seleccionaremos las variables de interés.
 covid.mx <- covid19.Mexico %>%
   filter(CLASIFICACION_FINAL == 3 | CLASIFICACION_FINAL == 1) %>% # Seleccion de casos confirmados
-  select(ENTIDAD_RES, TIPO_PACIENTE, FECHA_SINTOMAS, FECHA_DEF, ASMA) # Eleccion de variables de interes
+  select(ENTIDAD_RES, TIPO_PACIENTE, FECHA_INGRESO, FECHA_SINTOMAS, FECHA_DEF, ASMA) # Eleccion de variables de interes
 
 
 # Cambio de formato de las columnas a fechas
 covid.mx %<>%
   mutate(FECHA_SINTOMAS=as.Date(covid.mx$FECHA_SINTOMAS, format = "%Y-%m-%d")) %<>%
-  mutate(FECHA_DEF=as.Date(covid.mx$FECHA_DEF, format = "%Y-%m-%d"))
+  mutate(FECHA_DEF=as.Date(covid.mx$FECHA_DEF, format = "%Y-%m-%d")) %<>%
+  mutate(FECHA_INGRESO=as.Date(covid.mx$FECHA_INGRESO, format = "%Y-%m-%d"))
 
 
 # Creación de documento de datos tidy
@@ -51,18 +53,18 @@ write.table(covid.mx, file = 'Covid19_asma_gobmx.csv', sep = ",")
 
 # agrupar por fechas y obtener el numero de casos registrados en el dia
 x <- covid.mx %>%
-  mutate(CASOS=as.integer(1)) %>%
-  select(FECHA_SINTOMAS, CASOS) %$%
-  aggregate(CASOS ~ FECHA_SINTOMAS, FUN=sum)
+  filter(ASMA==1) %>%
+  select(FECHA_SINTOMAS, ASMA) %$%
+  aggregate(ASMA ~ FECHA_SINTOMAS, FUN=sum)
 
 # Se hará uso de la variable para poder manejar una barra en las fechas
 dateWindow <- c("2019-12-31", "2020-12-10")
 
 # Gráfica para evolución de casos confirmados
 x %>%
-  select(CASOS) %>%
+  select(ASMA) %>%
   xts(order.by = x$FECHA_SINTOMAS) %>%
-  dygraph(x$CASOS, main = "Evolución de casos confirmados en México") %>%
+  dygraph(x$ASMA, main = "Evolución de casos confirmados en México") %>%
   dyAxis("x", label="Fechas") %>%
   dyRoller(showRoller = TRUE, rollPeriod = 7) %>%
   dyRangeSelector(dateWindow=dateWindow)
@@ -70,16 +72,16 @@ x %>%
 
 # agrupar por fechas y obtener el numero de decesos registrados en el dia
 y <- covid.mx %>%
-  mutate(DECESOS=as.integer(1)) %>%
-  select(FECHA_DEF, DECESOS) %>%
-  filter(is.na(covid.mx$FECHA_DEF)==FALSE) %$%
-  aggregate(DECESOS ~ FECHA_DEF, FUN=sum)
+  filter(is.na(covid.mx$FECHA_DEF)==FALSE) %>%
+  filter(ASMA==1) %>%
+  select(FECHA_DEF, ASMA) %$%
+  aggregate(ASMA ~ FECHA_DEF, FUN=sum)
 
 # Gráfica para evolución de decesos
 y %>%
-  select(DECESOS) %>%
+  select(ASMA) %>%
   xts(order.by = y$FECHA_DEF) %>%
-  dygraph(y$DECESOS, main = "Evolución de decesos confirmados en México") %>%
+  dygraph(y$ASMA, main = "Evolución de decesos confirmados en México") %>%
   dyAxis("x", label="Fechas") %>%
   dyRoller(showRoller = TRUE, rollPeriod = 7) %>%
   dyRangeSelector(dateWindow=dateWindow)
@@ -92,6 +94,18 @@ df<- covid.mx$ASMA %>%
   mutate(porcentaje = freq/sum(freq)*100)
 
 head(df)
+
+
+# Gráfica de proporcion de confirmados por covid que padecen asma
+df1 <- data.frame("ASMA" = c("Si", "No", "No_esp"), "CASOS" = df$freq)
+
+a <- ggplot(df1, aes(x="", y=CASOS, fill=ASMA)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0) +
+  theme_void() +
+  scale_fill_brewer(palette="Set1")
+a
+
 
 
 # Contar por entidades el numero de casos confirmado con asma
@@ -131,16 +145,17 @@ asma.inter <- covid.mx %>%
 head(asma.inter)
 
 
-# se creo un dataframe con los valores requerios
-r <- data.frame(
-  "Ambulatorio" = c(inter$freq[1], asma.inter$ASMA[1]),
-  "Hospitalizado" = c(inter$freq[2], asma.inter$ASMA[2])
-)
+# Gráfica de proporción de casos hospitalizados con padecimiento de asma
+df2 <- data.frame("ASMA" = c("No", "Si"), "CASOS" = asma.inter$ASMA)
 
-# graficar comparacion entre el total de hospitalizados y hospitalizados con asma
-barplot(r$Hospitalizado, main = "Casos psotivos por covid19 hospitalizados",
-        names.arg  = c("Total", "Presenta sintomas de asma"),
-        col = c("royalblue", "seagreen"))
+b <- ggplot(df2, aes(x="", y=CASOS, fill=ASMA)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0) +
+  theme_void() +
+  scale_fill_brewer(palette="Set1")
+b
+
+
 
 
 # Indica con FALSE los casos de covid que fallecieron
@@ -163,15 +178,17 @@ asma.def <- covid.mx %>%
 last(asma.def$CASOS)
 
 
-# se creo un dataframe con los valores requerios
-s <- data.frame(
-  "DEF" = c(def$freq[1], last(asma.def$CASOS))
-)
 
-# grafica con el total de muertos y los muertos que padecian asma
-barplot(s$DEF, main = "Fallecimientos de casos positovos por covid19",
-        names.arg  = c("Total", "Presenta sintomas de asma"),
-        col = c("royalblue", "seagreen"))
+# gráfica de proporción de decesos con asma
+df4 <- data.frame("ASMA" = c("Si", "No"), "CASOS" = c(last(asma.def$CASOS), (def$freq[1]-last(asma.def$CASOS))))
+
+d <- ggplot(df4, aes(x="", y=CASOS, fill=ASMA)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0) +
+  theme_void() +
+  scale_fill_brewer(palette="Set1")
+d
+
 
 
 # Muestra el número de decesos de personas que fueron hospitalizadas y padecían asma
@@ -186,11 +203,85 @@ asma.def.int <- covid.mx %>%
 last(asma.def.int$CASOS)
 
 
-# se creo un dataframe con los valores requerios
+# Proporción de decesos que padecian asma y estuvieron hospitalizados
+df3 <- data.frame("Hospitalizado" = c("Si", "No"), "CASOS" = c(last(asma.def.int$CASOS), (last(asma.def$CASOS)-last(asma.def.int$CASOS))))
+
+c <- ggplot(df3, aes(x="", y=CASOS, fill=Hospitalizado)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0) +
+  theme_void() +
+  scale_fill_brewer(palette="Set1")
+c
+
+
+
+# Creación de un dataframe para ajustar fechas y realizar algunas gráficas
+dia1 = as.Date("2019-12-31",format="%Y-%m-%d")
+dia2 = as.Date("2020-12-08",format="%Y-%m-%d")
+
+# Se puede reutilzar y ajustar a necesidades
 u <- data.frame(
-  "DEF" = c(last(asma.def$CASOS), last(asma.def.int$CASOS))
+  "FECHA_SINTOMAS" = seq(dia1,dia2, by="day"),
+  "ASMA" = seq(0, by=length(seq(dia1,dia2, by="day")))
 )
 
-# grafica comparando el total de muertos con asma y muestos con asma que fueron hospitalizados
-barplot(u$DEF, main = "Fallecimientos con covid19 y padecimiento de asma", names.arg  = c("Total", "Hospitalizados"),
-        col = c("royalblue", "red"))
+e <- data.frame(
+  "FECHA_INGRESO" = seq(dia1,dia2, by="day"),
+  "CASOS_HOS" = seq(0, by=length(seq(dia1,dia2, by="day")))
+)
+
+f <- data.frame(
+  "FECHA_DEF" = seq(dia1,dia2, by="day"),
+  "CASOS_DEF" = seq(0, by=length(seq(dia1,dia2, by="day")))
+)
+
+
+#Casos con asma que fueron hospitalizados agrupados por fecha
+asma.inter.fecha <- covid.mx %>%
+  mutate(CASOS_HOS=as.integer(1)) %>%
+  filter(ASMA==1) %>%
+  filter(TIPO_PACIENTE==2) %>%
+  select(FECHA_INGRESO, CASOS_HOS) %>%
+  bind_rows(e) %$%
+  aggregate(CASOS_HOS ~ FECHA_INGRESO, FUN=sum) %>%
+  mutate(TOTAL_HOS=cumsum(CASOS_HOS))
+
+
+# Muestra el numero de fallecidos que padecian asma
+asma.def1 <- covid.mx %>%
+  select(FECHA_DEF, ASMA) %>%
+  filter(is.na(covid.mx$FECHA_DEF)==FALSE) %>%
+  filter(ASMA==1) %>%
+  dplyr::rename(CASOS_DEF=ASMA) %>%
+  bind_rows(f) %$%
+  aggregate(CASOS_DEF ~ FECHA_DEF, FUN=sum) %>%
+  mutate(TOTAL_DEF = cumsum(CASOS_DEF))
+
+
+
+# agrupar por fechas y obtener el numero de casos registrados en el dia
+w <- covid.mx %>%
+  filter(ASMA==1) %>%
+  select(FECHA_SINTOMAS, ASMA) %>%
+  bind_rows(u) %$%
+  aggregate(ASMA ~ FECHA_SINTOMAS, FUN=sum) %>%
+  mutate(ASMA_TOTAL=cumsum(ASMA))
+
+
+# Combinación de dataframes
+v <- bind_cols(asma.inter.fecha, asma.def1, w)
+
+
+# Gráficas de relación entre datos
+p <- ggplot(v, aes(x=TOTAL_HOS, y=TOTAL_DEF)) +
+  geom_point(shape=1) +    # Use hollow circles
+  geom_smooth() +          # Add a loess smoothed fit curve with confidence region
+  labs(x = "Hospitalizados", y = "Decesos")
+ggplotly(p)
+
+
+s <- ggplot(v, aes(x=ASMA_TOTAL, y=TOTAL_HOS)) +
+  geom_point(shape=1) +    # Use hollow circles
+  geom_smooth() +          # Add a loess smoothed fit curve with confidence region
+  labs(x = "Asmáticos", y = "Hospitalizados")
+ggplotly(s)

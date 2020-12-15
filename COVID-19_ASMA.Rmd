@@ -22,7 +22,7 @@ library("mxmaps")
 source("dash.R")
 ```
 
-Evolución de casos por día
+Evolución de casos con asma por día
 ===========================
 
 
@@ -30,9 +30,9 @@ Evolución de casos por día
 
 ```{r}
 x %>%
-  select(CASOS) %>%
+  select(ASMA) %>%
   xts(order.by = x$FECHA_SINTOMAS) %>%
-  dygraph(x$CASOS, main = "") %>%
+  dygraph(x$ASMA, main = "") %>%
   dyAxis("x", label="Fechas") %>%
   dyRoller(showRoller = TRUE, rollPeriod = 7) %>%
   dyRangeSelector(dateWindow=dateWindow)
@@ -44,19 +44,19 @@ x %>%
 
 ```{r}
 y %>%
-  select(DECESOS) %>%
+  select(ASMA) %>%
   xts(order.by = y$FECHA_DEF) %>%
-  dygraph(y$DECESOS, main = "") %>%
+  dygraph(y$ASMA, main = "") %>%
   dyAxis("x", label="Fechas") %>%
   dyRoller(showRoller = TRUE, rollPeriod = 7) %>%
   dyRangeSelector(dateWindow=dateWindow)
 ```
 
 
-Mapa
+Casos positvos con asma
 ======================================
 
-### Estados con casos positivos y padecimiento de asma
+### Concentración de casos en los estados
 
 ```{r}
 asma.ent %>%
@@ -64,39 +64,75 @@ asma.ent %>%
   mxstate_choropleth(asma.ent, title = "México")
 ```
 
+Row
+-------
+
+### Total de hospitalizados - Total de decesos
+```{r, message=FALSE}
+ggplotly(p)
+```
+
+
+### Total de casos con asma - Total de hospitalizados
+```{r}
+ggplotly(s)
+```
+
+
+Inputs {.sidebar}
+--------
+Estados con mas casos:
+
+Ciudad de México - 5287
+
+México - 1871
+
+Jalisco - 1725
+
+Nuevo León - 1523
+
+Sonora - 1503
+
+
+
+La relación que existe entre los datos es del .99 para ambos casos.
+
+
 Covid y asma
 ================
 
 Row
--------
+------
+
+### Casos confirmados por COVID-19
+
+```{r}
+a
+```
+
+
+
 ### Decesos de casos positvos a covid-19
 
 ```{r}
-barplot(s$DEF, main = "",
-        names.arg  = c("Total", "Presenta sintomas de asma"),
-        col = c("royalblue", "seagreen"))
+d
 ```
-
-
-### Casos positivos por covid-19 hospitalizados
-
-```{r}
-barplot(r$Hospitalizado, main = "",
-        names.arg  = c("Total", "Presenta sintomas de asma"),
-        col = c("royalblue", "seagreen"))
-```
-
 
 Row
 -------
 
+### Casos positivos por covid-19 hospitalizados
+
+```{r}
+b
+```
+
+
 ### Decesos con covid-19 y padecimiendo de asma
 
 ```{r}
-barplot(u$DEF, main = "", names.arg  = c("Total", "Hospitalizados"),
-        col = c("royalblue", "red"))
+c
 ```
-
 
 Inputs {.sidebar}
 --------
@@ -114,5 +150,6 @@ Total de casos hospitalizados: 249768
 Hospitalizados con asma: 5392
 
 Total de decesos que padecían asma y fueron hospitalizados : 1869
+
 
 
